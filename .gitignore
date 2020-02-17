@@ -24,3 +24,10 @@
 /Godeps/
 
 # End of https://www.gitignore.io/api/go
+
+k8s-logs
+logs-dashboard
+
+!/cmd/logs-dashboard
+
+*.txt
