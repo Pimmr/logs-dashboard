@@ -418,7 +418,7 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 				wait := make(chan struct{})
 				app.QueueUpdateDraw(func() {
 					exprBox.SetLabel("  ")
-					exprBox.SetText(fmt.Sprintf("Writting filtered logs to %s ...", fname))
+					exprBox.SetText(fmt.Sprintf("Writing filtered logs to %s ...", fname))
 					close(wait)
 				})
 				<-wait
@@ -524,6 +524,17 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 			lookupHold = ""
 		},
 		'C': store.Clear,
+		'K': func() {
+			pid, ok := store.Pid()
+			if !ok {
+				return
+			}
+			proc, err := os.FindProcess(pid)
+			if err != nil {
+				return
+			}
+			_ = proc.Signal(os.Interrupt)
+		},
 	}
 
 	app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {

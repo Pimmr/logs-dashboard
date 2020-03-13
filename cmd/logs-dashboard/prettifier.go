@@ -15,9 +15,9 @@ type Prettifier struct {
 	textFormatter logrus.Formatter
 	jsonFormatter *logrus.JSONFormatter
 
+	durationFields   []string
 	filterFields     []string
 	filterExclude    bool
-	durationFields   []string
 	useJSONFormatter bool
 	fullTime         bool
 	colors           bool

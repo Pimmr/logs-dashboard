@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +27,7 @@ type Line struct {
 
 type Entry struct {
 	ID   uint64
+	Time time.Time
 	line []byte
 }
 
@@ -33,21 +36,25 @@ type Store struct {
 	cache       map[uint64]*Entry
 	lastID      uint64
 	lookupKey   string
+	maxSort     int
 	offset      int
 	paused      int
 	knownFields []string
 	filterCache map[string]map[uint64][]byte
 	m           *sync.RWMutex
+	pid         int
 }
 
-func NewStore(lookupKey string) *Store {
+func NewStore(lookupKey string, maxSort int) *Store {
 	return &Store{
 		entries:     make([]*Entry, 0, StoreGrowingIncr),
 		cache:       make(map[uint64]*Entry, StoreGrowingIncr),
 		lookupKey:   lookupKey,
+		maxSort:     maxSort,
 		paused:      -1,
 		filterCache: map[string]map[uint64][]byte{},
 		m:           &sync.RWMutex{},
+		pid:         -1,
 	}
 }
 
@@ -59,6 +66,14 @@ func (store *Store) Clear() {
 	store.cache = make(map[uint64]*Entry, cap(store.entries))
 	store.paused = -1
 	store.filterCache = map[string]map[uint64][]byte{}
+}
+
+func (store *Store) Pid() (int, bool) {
+	if store.pid == -1 {
+		return 0, false
+	}
+
+	return store.pid, true
 }
 
 func (store *Store) getCached(filter string, entry uint64) ([]byte, bool) {
@@ -126,19 +141,36 @@ func (store *Store) Insert(line []byte) {
 		store.entries = lines
 	}
 
-	entry := &Entry{
-		ID:   store.lastID + 1,
-		line: line,
-	}
-	store.entries = append(store.entries, entry)
-	store.lastID++
-	store.cache[entry.ID] = entry
-
 	if store.paused < 0 {
 		store.offset = 0
 	}
 
-	ff, err := fields(line)
+	ff, pid, t, err := fields(line)
+	if pid != -1 {
+		store.pid = pid
+	}
+
+	entry := &Entry{
+		ID:   store.lastID + 1,
+		Time: t,
+		line: line,
+	}
+	store.entries = append(store.entries, entry)
+	if !t.IsZero() && len(store.entries) > 1 {
+		toSort := store.entries
+		if len(store.entries) > store.maxSort {
+			toSort = store.entries[len(store.entries)-store.maxSort:]
+		}
+		sort.SliceStable(toSort, func(i, j int) bool {
+			if toSort[i].Time.IsZero() {
+				return false
+			}
+			return toSort[i].Time.Before(toSort[j].Time)
+		})
+	}
+	store.lastID++
+	store.cache[entry.ID] = entry
+
 	if err != nil {
 		return
 	}
@@ -167,7 +199,7 @@ func (store *Store) KnownFieldsMatch(startsWith string) []string {
 	startsWith = strings.ToLower(startsWith)
 
 	store.m.RLock()
-	store.m.RUnlock()
+	defer store.m.RUnlock()
 	ret := make([]string, 0, len(store.knownFields))
 
 	for _, f := range store.knownFields {
@@ -181,7 +213,7 @@ func (store *Store) KnownFieldsMatch(startsWith string) []string {
 	return ret
 }
 
-func (store *Store) FilterN(N int, filterName string, filterFn func([]byte) ([]byte, error)) ([]*Entry, error) {
+func (store *Store) FilterN(n int, filterName string, filterFn func([]byte) ([]byte, error)) ([]*Entry, error) {
 	var err error
 
 	store.m.RLock()
@@ -192,7 +224,7 @@ func (store *Store) FilterN(N int, filterName string, filterFn func([]byte) ([]b
 		entries = entries[:store.paused]
 	}
 	// TODO(yazgazan): cache filter result
-	ret := make([]*Entry, N+store.offset)
+	ret := make([]*Entry, n+store.offset)
 	j := len(ret) - 1
 	for i := len(entries) - 1; j >= 0 && i >= 0; i-- {
 		if filterFn == nil {
@@ -234,7 +266,7 @@ func (store *Store) FilterN(N int, filterName string, filterFn func([]byte) ([]b
 
 func (store *Store) Count() int {
 	store.m.RLock()
-	store.m.RUnlock()
+	defer store.m.RUnlock()
 
 	return len(store.entries)
 }
@@ -360,17 +392,38 @@ func streamToStore(r io.Reader, store *Store, stop <-chan struct{}) (done <-chan
 	return doneCh
 }
 
-func fields(b []byte) ([]string, error) {
-	var v map[string]json.RawMessage
+func fields(b []byte) ([]string, int, time.Time, error) {
+	var (
+		v map[string]json.RawMessage
+		t time.Time
+	)
 
 	err := json.Unmarshal(b, &v)
 	if err != nil {
-		return nil, err
+		return nil, -1, time.Time{}, err
 	}
 	ss := make([]string, 0, len(v))
 	for k := range v {
 		ss = append(ss, k)
+		if k == "time" {
+			_ = json.Unmarshal(v[k], &t)
+		}
+	}
+	pid := -1
+
+	if pidField, ok := v["pid"]; ok {
+		err = json.Unmarshal(pidField, &pid)
+		if err != nil {
+			s := ""
+			err = json.Unmarshal(pidField, &s)
+			if err == nil {
+				i, err := strconv.ParseInt(s, 10, strconv.IntSize)
+				if err == nil {
+					pid = int(i)
+				}
+			}
+		}
 	}
 
-	return ss, nil
+	return ss, pid, t, nil
 }

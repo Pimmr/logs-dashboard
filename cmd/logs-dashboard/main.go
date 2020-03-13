@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/Pimmr/rig"
+	"github.com/Pimmr/rig/validators"
 )
 
 var (
@@ -24,6 +25,7 @@ func main() {
 		lookupKey     string
 		cpuProfile    string
 		initialFilter string
+		maxSort       = 200
 	)
 
 	stop := make(chan struct{})
@@ -35,6 +37,7 @@ func main() {
 			rig.String(&lookupKey, "lookup-key", "LOOKUP_KEY", "key to use for lookups"),
 			rig.String(&cpuProfile, "cpu-profile", "CPU_PROFILE", "cpu profile file"),
 			rig.String(&initialFilter, "filter", "INITIAL_FILTER", "initial filter"),
+			rig.Int(&maxSort, "max-sort", "MAX_SORT", "maximum number of entries to sort", validators.IntMin(2)),
 		},
 	}
 	err := flags.Parse(os.Args[1:])
@@ -60,13 +63,9 @@ func main() {
 		}
 	}
 
-	store := NewStore(lookupKey)
+	store := NewStore(lookupKey, maxSort)
 
-	filter, err := NewFilter()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
+	filter := NewFilter()
 	if initialFilter != "" {
 		filter.Set(initialFilter)
 	}
@@ -85,6 +84,7 @@ func main() {
 	ui := NewUI(store, filter, prettifier, filterHistory, excludeHistory)
 	err = ui.Run()
 	close(stop)
+	stopMonitoredProcess(store)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
@@ -102,4 +102,16 @@ func contains(ss []string, needle string) bool {
 	}
 
 	return false
+}
+
+func stopMonitoredProcess(store *Store) {
+	pid, ok := store.Pid()
+	if !ok {
+		return
+	}
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return
+	}
+	_ = proc.Signal(os.Interrupt)
 }

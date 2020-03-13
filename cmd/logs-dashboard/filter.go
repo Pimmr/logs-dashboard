@@ -12,10 +12,10 @@ type Filter struct {
 	m       *sync.Mutex
 }
 
-func NewFilter() (*Filter, error) {
+func NewFilter() *Filter {
 	return &Filter{
 		m: &sync.Mutex{},
-	}, nil
+	}
 }
 
 func (f *Filter) Close() {
