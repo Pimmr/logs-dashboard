@@ -20,7 +20,8 @@ var (
  q       quit
  /       edit filter
  j       scroll down / select next entry
- k       scroll down / select previous entry
+ k       scroll up / select previous entry
+ K       kill monitored process (require pid field)
  G       scroll to bottom
  f       edit field filter
  i       invert field filter
