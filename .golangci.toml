@@ -4,7 +4,7 @@
 
 [linters-settings]
     [linters-settings.gocyclo]
-        min-complexity = 10
+        min-complexity = 15
 
     [linters-settings.goconst]
         min-len = 2
@@ -12,6 +12,9 @@
 
     [linters-settings.misspell]
         locale = "US"
+
+    [linters-settings.errcheck]
+        ignore = "fmt:.*,github.com/go-kit/kit/log:^Log$"
 
 [linters]
     # White-listing, to be more CI safe.
@@ -41,6 +44,6 @@
         "misspell",
         "unparam",
         "prealloc",
-        "scopelint", # Would like to ignore *_test.go files, but can't atm.
+        "scopelint",
         "gocritic",
     ]

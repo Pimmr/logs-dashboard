@@ -25,9 +25,10 @@
 
 # End of https://www.gitignore.io/api/go
 
-k8s-logs
+logs-aggregate
 logs-dashboard
 
+!/cmd/logs-aggregate
 !/cmd/logs-dashboard
 
 *.txt

@@ -62,6 +62,7 @@ type UI struct {
 	app *tview.Application
 }
 
+//nolint
 func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, excludeHistory *History) *UI {
 	var lastFilterTime time.Duration
 
@@ -433,7 +434,7 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 				}
 				defer f.Close()
 				for _, l := range logs {
-					_, err = f.Write(append(l.line[:], '\n'))
+					_, err = f.Write(append(l.line, '\n'))
 					if err != nil {
 						panic(err) // TODO(yazgazan): show error
 					}

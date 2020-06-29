@@ -110,6 +110,7 @@ func (p *Prettifier) ToggleJSON() {
 	p.m.Unlock()
 }
 
+//nolint
 func (p *Prettifier) Prettify(in []byte, selected bool) []byte {
 	var fields logrus.Fields
 	var level logrus.Level

@@ -239,15 +239,15 @@ func (store *Store) FilterN(n int, filterName string, filterFn func([]byte) ([]b
 		if ok {
 			ret[j] = &Entry{
 				ID:   entries[i].ID,
-				line: filtered[:],
+				line: filtered,
 			}
 			j--
 			continue
 		}
 
-		filtered, err = filterFn(entries[i].line[:])
+		filtered, err = filterFn(entries[i].line)
 		if err != nil {
-			err = fmt.Errorf("filtering %q: %w", entries[i].line[:], err)
+			err = fmt.Errorf("filtering %q: %w", entries[i].line, err)
 			break
 		}
 		store.setCache(filterName, entries[i].ID, filtered)
@@ -256,7 +256,7 @@ func (store *Store) FilterN(n int, filterName string, filterFn func([]byte) ([]b
 		}
 		ret[j] = &Entry{
 			ID:   entries[i].ID,
-			line: filtered[:],
+			line: filtered,
 		}
 		j--
 	}
