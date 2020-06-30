@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 )
@@ -65,4 +66,27 @@ func (m *ConfigMap) set(s string) error {
 
 	(*m)[key] = value
 	return nil
+}
+
+func (m *ConfigMap) TryAdd(pod, container string) string {
+	if *m == nil {
+		*m = ConfigMap{}
+	}
+
+	if c, ok := (*m)[pod]; ok { // do not override
+		return c
+	}
+
+	(*m)[pod] = container
+	return container
+}
+
+func (m ConfigMap) Match(name string) (string, bool) {
+	for k, v := range m {
+		if ok, _ := path.Match(k, name); ok {
+			return v, true
+		}
+	}
+
+	return "", false
 }

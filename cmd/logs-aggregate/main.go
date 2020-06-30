@@ -16,11 +16,13 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 )
 
+// TODO: use Config.Containers
+
 type Config struct {
-	Pods        []string
-	Deployments []string
-	Labels      []string
-	Gcloud      []string
+	Pods        []string `flag:"pod" usage:"stream logs from these pods"`
+	Deployments []string `flag:"deploy" usage:"stream logs from pods in these deployments"`
+	Labels      []string `flag:"label" usage:"stream logs from pods matching these selectors"`
+	Gcloud      []string `usage:"stream logs from these stackdriver logs"`
 
 	CPUProfile string
 
@@ -29,7 +31,7 @@ type Config struct {
 	Namespace     string `usage:"kubectl namespace"`
 	Since         time.Duration
 	Tail          int64
-	Containers    ConfigMap `usage:"specify container for deployments and pods (i.e 'deploymentName:containerName')"`
+	Containers    ConfigMap `usage:"specify container for deployments and pods (i.e 'deploy/deploymentName:containerName' or 'pod/podName:containerName').\n The keys can use * and ? for pattern matching"`
 	GcloudProject string
 	Follow        bool
 	Previous      bool `usage:"show logs for previous pods"`

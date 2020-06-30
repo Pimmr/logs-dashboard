@@ -131,9 +131,11 @@ func (k8s *Kubernetes) PodLogs(podName string) (io.ReadCloser, error) {
 		tailLinesParam = &k8s.tail
 	}
 
+	container, _ := k8s.containersOverride.Match("pod/" + podName)
+
 	pods := k8s.clientset.CoreV1().Pods(pod.GetNamespace())
 	req := pods.GetLogs(podName, &v1.PodLogOptions{
-		Container:    "",
+		Container:    container,
 		Follow:       k8s.follow,
 		SinceSeconds: sinceSeconds,
 		TailLines:    tailLinesParam,
@@ -177,6 +179,9 @@ func (k8s *Kubernetes) DeploymentPods(deploymentName string) []string {
 				continue
 			}
 
+			if container, ok := k8s.containersOverride.Match("deploy/" + deploymentName); ok {
+				k8s.containersOverride.TryAdd("pod/"+name, container)
+			}
 			podsNames = append(podsNames, name)
 			break
 		}
