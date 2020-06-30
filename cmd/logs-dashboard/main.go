@@ -17,6 +17,7 @@ var (
 
 // TODO:
 // - [ ] Search / Highlight
+// - [ ] Add toggle to show stacktraces on multiple lines
 
 func main() {
 	var (

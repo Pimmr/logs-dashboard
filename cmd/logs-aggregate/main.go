@@ -33,6 +33,7 @@ type Config struct {
 	Tail          int64
 	Containers    ConfigMap `usage:"specify container for deployments and pods (i.e 'deploy/deploymentName:containerName' or 'pod/podName:containerName').\n The keys can use * and ? for pattern matching"`
 	GcloudProject string
+	GcloudPoll    time.Duration
 	Follow        bool
 	Previous      bool `usage:"show logs for previous pods"`
 	Pid           bool
@@ -43,6 +44,7 @@ func main() {
 		Tail: -1,
 
 		GcloudProject: "cally-re",
+		GcloudPoll:    5 * time.Second,
 	}
 
 	if home := homeDir(); home != "" {
@@ -57,10 +59,6 @@ func main() {
 
 	if conf.Previous && conf.Follow {
 		fmt.Fprintln(os.Stderr, "Error: cannot combine -previous with -follow")
-		os.Exit(2)
-	}
-	if len(conf.Gcloud) != 0 && conf.Follow {
-		fmt.Fprintln(os.Stderr, "Error: cannot combine -gcloud with -follow")
 		os.Exit(2)
 	}
 
@@ -114,10 +112,7 @@ func main() {
 	}
 
 	for _, gcloud := range conf.Gcloud {
-		stream, err := gcloudStream(conf, gcloud)
-		exitIfError(err)
-
-		streams = append(streams, stream)
+		streams = append(streams, gcloudStream(conf, gcloud))
 	}
 
 	defer closeStreams(streams)

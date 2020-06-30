@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
@@ -12,23 +11,80 @@ import (
 	"time"
 )
 
-func gcloudStream(conf Config, logName string) (io.ReadCloser, error) {
-	logPath := path.Join("projects", conf.GcloudProject, "logs", logName)
-	filter := "logName=" + logPath
+func gcloudStream(conf Config, logName string) io.ReadCloser {
+	r, w := io.Pipe()
+	enc := json.NewEncoder(w)
 
-	args := []string{
-		"logging", "read",
-		filter,
-		"--format=json",
-	}
-	if conf.Since > 0 {
-		args = append(args, "--freshness="+conf.Since.String())
-	}
-	if conf.Tail >= 0 {
-		args = append(args, "--limit="+strconv.FormatInt(conf.Tail, 10))
+	go func() {
+		var lastTimestamp time.Time
+
+		interval := conf.GcloudPoll
+		if !conf.Follow {
+			interval = 0
+		}
+
+		knownInsertIDs := make(map[string]struct{}, 10000)
+
+		for range Tick(interval) {
+			entries, err := gcloudStreamEntries(conf, lastTimestamp, logName)
+			if err != nil {
+				_ = enc.Encode(json.RawMessage([]byte("Error: " + err.Error())))
+				return
+			}
+
+			// entries is in reverse chronological order
+			for i := len(entries) - 1; i >= 0; i-- {
+				if _, ok := knownInsertIDs[entries[i].InsertID]; ok {
+					continue
+				}
+				knownInsertIDs[entries[i].InsertID] = struct{}{}
+
+				entry := entries[i].ToLogrus()
+				err := enc.Encode(entry)
+				if err != nil {
+					_ = enc.Encode(json.RawMessage([]byte("Error: failed to encode log")))
+				}
+			}
+			if len(entries) != 0 {
+				lastTimestamp = entries[0].Timestamp
+			}
+			if !conf.Follow {
+				w.Close()
+				return
+			}
+		}
+	}()
+
+	return r
+}
+
+func Tick(d time.Duration) <-chan time.Time {
+	c := make(chan time.Time)
+
+	if d == 0 {
+		go func() {
+			c <- time.Now()
+			close(c)
+		}()
+
+		return c
 	}
 
-	cmd := exec.Command("gcloud", args...)
+	go func() {
+		c <- time.Now()
+
+		for t := range time.Tick(d) {
+			c <- t
+		}
+	}()
+
+	return c
+}
+
+func gcloudStreamEntries(conf Config, lastTimestamp time.Time, logName string) ([]Entry, error) {
+	cmdName, args := gcloudStreamBuildCmd(conf, lastTimestamp, logName)
+
+	cmd := exec.Command(cmdName, args...)
 	out := &bytes.Buffer{}
 	cmd.Stdout = out
 	cmd.Stderr = os.Stderr
@@ -44,23 +100,37 @@ func gcloudStream(conf Config, logName string) (io.ReadCloser, error) {
 		return nil, err
 	}
 
-	ret := &bytes.Buffer{}
-	enc := json.NewEncoder(ret)
-	for i := len(entries) - 1; i >= 0; i-- {
-		entry := entries[i].ToLogrus()
-		err := enc.Encode(entry)
-		if err != nil {
-			_ = enc.Encode(json.RawMessage([]byte("Error: failed to encode log")))
-		}
+	return entries, nil
+}
+
+func gcloudStreamBuildCmd(conf Config, lastTimestamp time.Time, logName string) (string, []string) {
+	logPath := path.Join("projects", conf.GcloudProject, "logs", logName)
+	filter := "logName=" + logPath
+
+	if !lastTimestamp.IsZero() {
+		filter += " timestamp>=" + strconv.Quote(lastTimestamp.UTC().Format(time.RFC3339))
 	}
 
-	return ioutil.NopCloser(ret), nil
+	args := []string{
+		"logging", "read",
+		filter,
+		"--format=json",
+	}
+	if lastTimestamp.IsZero() && conf.Since > 0 {
+		args = append(args, "--freshness="+conf.Since.String())
+	}
+	if conf.Tail >= 0 {
+		args = append(args, "--limit="+strconv.FormatInt(conf.Tail, 10))
+	}
+
+	return "gcloud", args
 }
 
 type Entry struct {
 	JSONPayload json.RawMessage
 	Severity    string
 	Timestamp   time.Time
+	InsertID    string
 
 	msg     string
 	payload map[string]interface{}
@@ -75,6 +145,7 @@ func (e *Entry) ToLogrus() map[string]interface{} {
 	payload := e.Payload()
 	logrusEntry := make(map[string]interface{}, len(payload)+3)
 
+	// TODO: flatten .Exception
 	for k, v := range payload {
 		switch k {
 		case "msg", "time", "level":
