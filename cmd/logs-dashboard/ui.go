@@ -512,7 +512,7 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 				exprBox.SetText(lookupHold)
 				return
 			}
-			q := fmt.Sprintf("%s = %s", store.LookupKey(), lookupValue)
+			q := fmt.Sprintf("%s ~= %s", store.LookupKey(), lookupValue)
 			filter.Set(q)
 			exprBox.SetText(q)
 		},
