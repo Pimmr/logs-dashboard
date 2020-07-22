@@ -8,6 +8,7 @@ import (
 
 	"github.com/Pimmr/rig"
 	"github.com/Pimmr/rig/validators"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 var (
@@ -45,6 +46,9 @@ func main() {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(2)
+	}
+	if terminal.IsTerminal(int(os.Stdin.Fd())) {
+		os.Stdin, _ = os.Open("/dev/null")
 	}
 
 	if cpuProfile != "" {
