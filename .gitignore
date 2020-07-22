@@ -17,11 +17,6 @@
 *.out
 
 # Dependency directories (remove the comment below to include it)
-# vendor/
-
-### Go Patch ###
-/vendor/
-/Godeps/
 
 # End of https://www.gitignore.io/api/go
 
