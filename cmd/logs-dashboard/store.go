@@ -146,7 +146,7 @@ func (store *Store) Insert(line []byte) {
 	}
 
 	ff, pid, t, err := fields(line)
-	if pid != -1 {
+	if pid != -1 && store.pid == -1 {
 		store.pid = pid
 	}
 

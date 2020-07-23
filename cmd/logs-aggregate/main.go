@@ -23,6 +23,7 @@ type Config struct {
 	Deployments []string `flag:"deploy" usage:"stream logs from pods in these deployments"`
 	Labels      []string `flag:"label" usage:"stream logs from pods matching these selectors"`
 	Gcloud      []string `usage:"stream logs from these stackdriver logs"`
+	Listen      string   `usage:"listen for logs streamed over HTTP"`
 
 	CPUProfile string
 
@@ -113,6 +114,10 @@ func main() {
 
 	for _, gcloud := range conf.Gcloud {
 		streams = append(streams, gcloudStream(conf, gcloud))
+	}
+
+	if conf.Listen != "" {
+		streams = append(streams, httpStream(conf.Listen, conf.Follow))
 	}
 
 	defer closeStreams(streams)
