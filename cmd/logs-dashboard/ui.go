@@ -29,7 +29,8 @@ var (
  w       enable/disable line-wrap
  p       toggle json/text modes
  P       toggle multiline JSON (json mode)
- t       toggle fulltimestamps (text mode)
+ t       toggle full timestamps (text mode)
+ T       toggle local/UTC timestamps (text mode)
  c       toggle colors (text mode)
  s       save filtered logs
  l       enter lookup mode
@@ -407,6 +408,9 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 		},
 		't': func() {
 			prettifier.ToggleFulltime()
+		},
+		'T': func() {
+			prettifier.ToggleLocalTime()
 		},
 		'i': func() {
 			prettifier.ToggleFilterExclude()

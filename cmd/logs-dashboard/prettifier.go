@@ -20,6 +20,7 @@ type Prettifier struct {
 	filterExclude    bool
 	useJSONFormatter bool
 	fullTime         bool
+	localTime        bool
 	colors           bool
 }
 
@@ -36,16 +37,57 @@ func NewPrettifier(filter, durations []string) *Prettifier {
 		colors:         true,
 	}
 
-	p.textFormatter = NewTextFormatter(p.fullTime, p.colors)
+	p.textFormatter = NewTextFormatter(p.fullTime, p.colors, false)
 
 	return p
 }
 
-func NewTextFormatter(fulltime, colors bool) logrus.Formatter {
-	return NewColorFormatter(&logrus.TextFormatter{
-		FullTimestamp: fulltime,
-		ForceColors:   true,
-	}, colors)
+type Transformer func(*logrus.Entry) *logrus.Entry
+
+func NewTextFormatter(fulltime, colors, localTime bool) logrus.Formatter {
+	if !localTime {
+		return NewTransformFormatter(
+			NewColorFormatter(&logrus.TextFormatter{
+				FullTimestamp: fulltime,
+				ForceColors:   true,
+			}, colors),
+			func(e *logrus.Entry) *logrus.Entry {
+				ret := *e
+				ret.Time = ret.Time.UTC()
+
+				return &ret
+			},
+		)
+	}
+
+	return NewTransformFormatter(
+		NewColorFormatter(&logrus.TextFormatter{
+			FullTimestamp: fulltime,
+			ForceColors:   true,
+		}, colors),
+		func(e *logrus.Entry) *logrus.Entry {
+			ret := *e
+			ret.Time = ret.Time.Local()
+
+			return &ret
+		},
+	)
+}
+
+type transformFormatter struct {
+	formatter   logrus.Formatter
+	transformer Transformer
+}
+
+func NewTransformFormatter(formatter logrus.Formatter, transformer Transformer) logrus.Formatter {
+	return &transformFormatter{
+		formatter:   formatter,
+		transformer: transformer,
+	}
+}
+
+func (f *transformFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	return f.formatter.Format(f.transformer(entry))
 }
 
 func (p *Prettifier) SetFilterFields(filterFields []string) {
@@ -93,7 +135,15 @@ func (p *Prettifier) ToggleFulltime() {
 	defer p.m.Unlock()
 
 	p.fullTime = !p.fullTime
-	p.textFormatter = NewTextFormatter(p.fullTime, p.colors)
+	p.textFormatter = NewTextFormatter(p.fullTime, p.colors, p.localTime)
+}
+
+func (p *Prettifier) ToggleLocalTime() {
+	p.m.Lock()
+	defer p.m.Unlock()
+
+	p.localTime = !p.localTime
+	p.textFormatter = NewTextFormatter(p.fullTime, p.colors, p.localTime)
 }
 
 func (p *Prettifier) ToggleColors() {
@@ -101,7 +151,7 @@ func (p *Prettifier) ToggleColors() {
 	defer p.m.Unlock()
 
 	p.colors = !p.colors
-	p.textFormatter = NewTextFormatter(p.fullTime, p.colors)
+	p.textFormatter = NewTextFormatter(p.fullTime, p.colors, p.localTime)
 }
 
 func (p *Prettifier) ToggleJSON() {
