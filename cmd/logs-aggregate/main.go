@@ -22,7 +22,7 @@ type Config struct {
 	Pods        []string `flag:"pod" usage:"stream logs from these pods"`
 	Deployments []string `flag:"deploy" usage:"stream logs from pods in these deployments"`
 	Labels      []string `flag:"label" usage:"stream logs from pods matching these selectors"`
-	Gcloud      []string `usage:"stream logs from these stackdriver logs"`
+	Gcloud      []string `usage:"stream logs from these filters"`
 	Listen      string   `usage:"listen for logs streamed over HTTP"`
 
 	CPUProfile string
@@ -69,15 +69,15 @@ func main() {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
-		defer func() {
-			pprof.StopCPUProfile()
-			pprofF.Close()
-		}()
 		err = pprof.StartCPUProfile(pprofF)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			os.Exit(1)
 		}
+		defer func() {
+			pprof.StopCPUProfile()
+			pprofF.Close()
+		}()
 	}
 
 	k8s, err := NewKubernetes(conf)

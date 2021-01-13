@@ -6,12 +6,11 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path"
 	"strconv"
 	"time"
 )
 
-func gcloudStream(conf Config, logName string) io.ReadCloser {
+func gcloudStream(conf Config, filter string) io.ReadCloser {
 	r, w := io.Pipe()
 	enc := json.NewEncoder(w)
 
@@ -26,7 +25,7 @@ func gcloudStream(conf Config, logName string) io.ReadCloser {
 		knownInsertIDs := make(map[string]struct{}, 10000)
 
 		for range Tick(interval) {
-			entries, err := gcloudStreamEntries(conf, lastTimestamp, logName)
+			entries, err := gcloudStreamEntries(conf, lastTimestamp, filter)
 			if err != nil {
 				_ = enc.Encode(json.RawMessage([]byte("Error: " + err.Error())))
 				return
@@ -81,8 +80,8 @@ func Tick(d time.Duration) <-chan time.Time {
 	return c
 }
 
-func gcloudStreamEntries(conf Config, lastTimestamp time.Time, logName string) ([]Entry, error) {
-	cmdName, args := gcloudStreamBuildCmd(conf, lastTimestamp, logName)
+func gcloudStreamEntries(conf Config, lastTimestamp time.Time, filter string) ([]Entry, error) {
+	cmdName, args := gcloudStreamBuildCmd(conf, lastTimestamp, filter)
 
 	cmd := exec.Command(cmdName, args...)
 	out := &bytes.Buffer{}
@@ -103,10 +102,7 @@ func gcloudStreamEntries(conf Config, lastTimestamp time.Time, logName string) (
 	return entries, nil
 }
 
-func gcloudStreamBuildCmd(conf Config, lastTimestamp time.Time, logName string) (string, []string) {
-	logPath := path.Join("projects", conf.GcloudProject, "logs", logName)
-	filter := "logName=" + logPath
-
+func gcloudStreamBuildCmd(conf Config, lastTimestamp time.Time, filter string) (string, []string) {
 	if !lastTimestamp.IsZero() {
 		filter += " timestamp>=" + strconv.Quote(lastTimestamp.UTC().Format(time.RFC3339))
 	}
@@ -157,6 +153,11 @@ func (e *Entry) ToLogrus() map[string]interface{} {
 
 	logrusEntry["time"] = e.Timestamp
 	logrusEntry["msg"] = e.Message()
+	switch logrusEntry["msg"] {
+	case "", "-":
+		logrusEntry["msg"] = payload["msg"]
+	}
+
 	if level, ok := severityMap[e.Severity]; ok {
 		logrusEntry["level"] = level
 	} else {
