@@ -524,12 +524,16 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 			exprBox.SetText(q)
 		},
 		'\x00': func() {
-			if mode == NormalMode {
+			if mode != NormalMode {
+				mode = NormalMode
+				selected = -1
+				selectedID = 0
+				lookupHold = ""
 				return
 			}
-			mode = NormalMode
-			selected = -1
-			selectedID = 0
+			lastFilterTime = 0
+			filter.Set(lookupHold)
+			exprBox.SetText(lookupHold)
 			lookupHold = ""
 		},
 		'C': store.Clear,
