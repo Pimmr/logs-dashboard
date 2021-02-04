@@ -49,7 +49,7 @@ func (f *Filter) Set(q string) {
 	f.queries = qq
 }
 
-func (f *Filter) Execute(b []byte) (_ []byte, returnErr error) {
+func (f *Filter) Execute(id uint64, b []byte) (_ []byte, returnErr error) {
 	if len(f.queries) == 0 {
 		return b, nil
 	}
@@ -60,7 +60,12 @@ func (f *Filter) Execute(b []byte) (_ []byte, returnErr error) {
 			"raw": string(b),
 		})
 	} else if m, ok := parser.Data.(map[string]interface{}); ok && m["raw"] == nil {
-		m["raw"] = string(b)
+		if m["raw"] == nil {
+			m["raw"] = string(b)
+		}
+		if m["_id"] == nil {
+			m["_id"] = int64(id)
+		}
 	}
 
 	for _, q := range f.queries {

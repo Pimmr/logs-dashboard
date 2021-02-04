@@ -213,7 +213,7 @@ func (store *Store) KnownFieldsMatch(startsWith string) []string {
 	return ret
 }
 
-func (store *Store) FilterN(n int, filterName string, filterFn func([]byte) ([]byte, error)) ([]*Entry, error) {
+func (store *Store) FilterN(n int, filterName string, filterFn func(uint64, []byte) ([]byte, error)) ([]*Entry, error) {
 	var err error
 
 	store.m.RLock()
@@ -245,7 +245,7 @@ func (store *Store) FilterN(n int, filterName string, filterFn func([]byte) ([]b
 			continue
 		}
 
-		filtered, err = filterFn(entries[i].line)
+		filtered, err = filterFn(entries[i].ID, entries[i].line)
 		if err != nil {
 			err = fmt.Errorf("filtering %q: %w", entries[i].line, err)
 			break

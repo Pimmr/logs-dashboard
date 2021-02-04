@@ -27,6 +27,7 @@ func main() {
 		lookupKey     string
 		cpuProfile    string
 		initialFilter string
+		stacktrace    bool
 		maxSort       = 200
 	)
 
@@ -39,6 +40,7 @@ func main() {
 			rig.String(&lookupKey, "lookup-key", "LOOKUP_KEY", "key to use for lookups"),
 			rig.String(&cpuProfile, "cpu-profile", "CPU_PROFILE", "cpu profile file"),
 			rig.String(&initialFilter, "filter", "INITIAL_FILTER", "initial filter"),
+			rig.Bool(&stacktrace, "stacktrace", "STACKTRACE", "expand stack traces"),
 			rig.Int(&maxSort, "max-sort", "MAX_SORT", "maximum number of entries to sort", validators.IntMin(2)),
 		},
 	}
@@ -64,7 +66,9 @@ func main() {
 		err = pprof.StartCPUProfile(pprofF)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			pprof.StopCPUProfile()
+			pprofF.Close()
+			os.Exit(1) //nolint: gocritic
 		}
 	}
 
@@ -77,7 +81,7 @@ func main() {
 	store.AddKnownFields(filter.Keywords()...)
 	store.AddKnownFields("raw")
 
-	prettifier := NewPrettifier(exclude, durations)
+	prettifier := NewPrettifier(exclude, durations, stacktrace)
 	filterHistory := NewHistory(loadFilterHistory())
 	excludeHistory := NewHistory(loadExcludeHistory(strings.Join(prettifier.GetFilterFields(), ",")))
 

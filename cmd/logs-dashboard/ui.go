@@ -33,7 +33,9 @@ var (
  T       toggle local/UTC timestamps (text mode)
  c       toggle colors (text mode)
  s       save filtered logs
+ S       expand stack trace
  l       enter lookup mode
+ z       only show line selected in lookup mode
  \n      select line to lookup
  ^ESC    return to normal mode (lookup mode)
  C       clear logs
@@ -400,24 +402,12 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 		'w': func() {
 			logsBox.ToggleWrap()
 		},
-		'p': func() {
-			prettifier.ToggleJSON()
-		},
-		'P': func() {
-			prettifier.ToggleJSONPretty()
-		},
-		't': func() {
-			prettifier.ToggleFulltime()
-		},
-		'T': func() {
-			prettifier.ToggleLocalTime()
-		},
-		'i': func() {
-			prettifier.ToggleFilterExclude()
-		},
-		'c': func() {
-			prettifier.ToggleColors()
-		},
+		'p': prettifier.ToggleJSON,
+		'P': prettifier.ToggleJSONPretty,
+		't': prettifier.ToggleFulltime,
+		'T': prettifier.ToggleLocalTime,
+		'i': prettifier.ToggleFilterExclude,
+		'c': prettifier.ToggleColors,
 		's': func() {
 			go func() {
 				fname := time.Now().Format("./logs-20060102150405.json")
@@ -466,6 +456,7 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 				})
 			}()
 		},
+		'S': prettifier.ToggleStackTrace,
 		'h': func() {
 			pages.SwitchToPage("help")
 			showingHelp = true
@@ -517,6 +508,18 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 				return
 			}
 			q := fmt.Sprintf("%s ~= %s", store.LookupKey(), lookupValue)
+			filter.Set(q)
+			exprBox.SetText(q)
+		},
+		'z': func() {
+			if mode == NormalMode {
+				return
+			}
+			mode = NormalMode
+			q := fmt.Sprintf("_id = %d", selectedID)
+			lastFilterTime = 0
+			selected = -1
+			selectedID = 0
 			filter.Set(q)
 			exprBox.SetText(q)
 		},

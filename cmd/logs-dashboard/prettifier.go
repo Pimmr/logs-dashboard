@@ -22,9 +22,10 @@ type Prettifier struct {
 	fullTime         bool
 	localTime        bool
 	colors           bool
+	stacktrace       bool
 }
 
-func NewPrettifier(filter, durations []string) *Prettifier {
+func NewPrettifier(filter, durations []string, stacktrace bool) *Prettifier {
 	p := &Prettifier{
 		m: &sync.RWMutex{},
 		jsonFormatter: &logrus.JSONFormatter{
@@ -35,16 +36,17 @@ func NewPrettifier(filter, durations []string) *Prettifier {
 		durationFields: durations,
 		fullTime:       false,
 		colors:         true,
+		stacktrace:     stacktrace,
 	}
 
-	p.textFormatter = NewTextFormatter(p.fullTime, p.colors, false)
+	p.textFormatter = NewTextFormatter(p.fullTime, p.colors, false, stacktrace)
 
 	return p
 }
 
 type Transformer func(*logrus.Entry) *logrus.Entry
 
-func NewTextFormatter(fulltime, colors, localTime bool) logrus.Formatter {
+func NewTextFormatter(fulltime, colors, localTime, stacktrace bool) logrus.Formatter {
 	if !localTime {
 		return NewTransformFormatter(
 			NewColorFormatter(&logrus.TextFormatter{
@@ -57,6 +59,7 @@ func NewTextFormatter(fulltime, colors, localTime bool) logrus.Formatter {
 
 				return &ret
 			},
+			stacktrace,
 		)
 	}
 
@@ -71,23 +74,33 @@ func NewTextFormatter(fulltime, colors, localTime bool) logrus.Formatter {
 
 			return &ret
 		},
+		stacktrace,
 	)
 }
 
 type transformFormatter struct {
 	formatter   logrus.Formatter
 	transformer Transformer
+	stacktrace  bool
 }
 
-func NewTransformFormatter(formatter logrus.Formatter, transformer Transformer) logrus.Formatter {
+func NewTransformFormatter(formatter logrus.Formatter, transformer Transformer, stacktrace bool) logrus.Formatter {
 	return &transformFormatter{
 		formatter:   formatter,
 		transformer: transformer,
+		stacktrace:  stacktrace,
 	}
 }
 
 func (f *transformFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	return f.formatter.Format(f.transformer(entry))
+	b, err := f.formatter.Format(f.transformer(entry))
+	stacktrace, ok := entry.Data["stacktrace"].(string)
+	if err != nil || !f.stacktrace || !ok {
+		return b, err
+	}
+	b = bytes.Join([][]byte{b, []byte(stacktrace)}, []byte("\n"))
+
+	return b, nil
 }
 
 func (p *Prettifier) SetFilterFields(filterFields []string) {
@@ -135,7 +148,7 @@ func (p *Prettifier) ToggleFulltime() {
 	defer p.m.Unlock()
 
 	p.fullTime = !p.fullTime
-	p.textFormatter = NewTextFormatter(p.fullTime, p.colors, p.localTime)
+	p.textFormatter = NewTextFormatter(p.fullTime, p.colors, p.localTime, p.stacktrace)
 }
 
 func (p *Prettifier) ToggleLocalTime() {
@@ -143,7 +156,7 @@ func (p *Prettifier) ToggleLocalTime() {
 	defer p.m.Unlock()
 
 	p.localTime = !p.localTime
-	p.textFormatter = NewTextFormatter(p.fullTime, p.colors, p.localTime)
+	p.textFormatter = NewTextFormatter(p.fullTime, p.colors, p.localTime, p.stacktrace)
 }
 
 func (p *Prettifier) ToggleColors() {
@@ -151,7 +164,15 @@ func (p *Prettifier) ToggleColors() {
 	defer p.m.Unlock()
 
 	p.colors = !p.colors
-	p.textFormatter = NewTextFormatter(p.fullTime, p.colors, p.localTime)
+	p.textFormatter = NewTextFormatter(p.fullTime, p.colors, p.localTime, p.stacktrace)
+}
+
+func (p *Prettifier) ToggleStackTrace() {
+	p.m.Lock()
+	defer p.m.Unlock()
+
+	p.stacktrace = !p.stacktrace
+	p.textFormatter = NewTextFormatter(p.fullTime, p.colors, p.localTime, p.stacktrace)
 }
 
 func (p *Prettifier) ToggleJSON() {
