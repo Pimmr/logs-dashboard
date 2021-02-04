@@ -37,7 +37,7 @@ var (
  l       enter lookup mode
  z       only show line selected in lookup mode
  \n      select line to lookup
- ^ESC    return to normal mode (lookup mode)
+ ^ESC    return to normal mode and reset filter to pre-lookup state
  C       clear logs
  h, ?    display this help
 `
