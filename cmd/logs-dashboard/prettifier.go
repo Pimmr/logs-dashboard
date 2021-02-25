@@ -202,10 +202,9 @@ func (p *Prettifier) Prettify(in []byte, selected bool) []byte {
 
 	msg, ok := fields["msg"].(string)
 	if !ok {
-		msg = "'msg' field missing"
-	} else {
-		delete(fields, "msg")
+		msg = "-"
 	}
+	delete(fields, "msg")
 	levelStr, ok := fields["level"].(string)
 	if ok {
 		delete(fields, "level")

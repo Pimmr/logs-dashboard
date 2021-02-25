@@ -473,9 +473,6 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 				selectedID = 0
 				return
 			}
-			if store.LookupKey() == "" {
-				return
-			}
 
 			mode = LookupMode
 			if lookupHold != "" {
@@ -495,6 +492,13 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 		},
 		'\n': func() {
 			if mode == NormalMode {
+				return
+			}
+			if store.LookupKey() == "" {
+				mode = NormalMode
+				selected = -1
+				selectedID = 0
+				lookupHold = ""
 				return
 			}
 			mode = NormalMode
@@ -529,6 +533,9 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 				selected = -1
 				selectedID = 0
 				lookupHold = ""
+				return
+			}
+			if lookupHold == "" {
 				return
 			}
 			lastFilterTime = 0
@@ -567,6 +574,10 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 			r = '\n'
 		case tcell.KeyEsc:
 			r = '\x00'
+		case tcell.KeyUp:
+			r = 'k'
+		case tcell.KeyDown:
+			r = 'j'
 		}
 		action, ok := actions[r]
 		if !ok {
