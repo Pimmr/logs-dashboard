@@ -38,6 +38,8 @@ var (
  z       only show line selected in lookup mode
  \n      select line to lookup
  ^ESC    return to normal mode and reset filter to pre-lookup state
+ [/{     in lookup mode, remove/restore left-most part of the filter (IFS must be set)
+ ]/}     in lookup mode, remove/restore right-most part of the filter (IFS must be set)
  C       clear logs
  h, ?    display this help
 `
@@ -468,6 +470,8 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 			showingHelp = true
 		},
 		'l': func() {
+			headHold = []string{}
+			tailHold = []string{}
 			if mode == LookupMode {
 				mode = NormalMode
 				lookupHold = ""
