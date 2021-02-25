@@ -31,11 +31,21 @@ type Entry struct {
 	line []byte
 }
 
+type LookupKey struct {
+	Key     string
+	IFS     string
+	Exclude []string
+}
+
+func (k LookupKey) IsZero() bool {
+	return k.Key == ""
+}
+
 type Store struct {
 	entries     []*Entry
 	cache       map[uint64]*Entry
 	lastID      uint64
-	lookupKey   string
+	lookupKey   LookupKey
 	maxSort     int
 	offset      int
 	paused      int
@@ -45,7 +55,7 @@ type Store struct {
 	pid         int
 }
 
-func NewStore(lookupKey string, maxSort int) *Store {
+func NewStore(lookupKey LookupKey, maxSort int) *Store {
 	return &Store{
 		entries:     make([]*Entry, 0, StoreGrowingIncr),
 		cache:       make(map[uint64]*Entry, StoreGrowingIncr),
@@ -99,9 +109,9 @@ func (store *Store) setCache(filter string, entry uint64, b []byte) {
 	c[entry] = b
 }
 
-func (store *Store) LookupValue(id uint64) string {
-	if store.lookupKey == "" {
-		return ""
+func (store *Store) LookupValues(id uint64) []string {
+	if store.lookupKey.IsZero() {
+		return nil
 	}
 
 	store.m.RLock()
@@ -109,25 +119,52 @@ func (store *Store) LookupValue(id uint64) string {
 
 	entry, ok := store.cache[id]
 	if !ok {
-		return ""
+		return nil
 	}
 
-	r := gjson.GetBytes(entry.line, store.lookupKey)
+	r := gjson.GetBytes(entry.line, store.lookupKey.Key)
 	if !r.Exists() {
-		return ""
+		return nil
 	}
 
 	v := r.Value()
+	s, ok := v.(string)
+	if !ok || store.lookupKey.IFS == "" {
+		b, err := json.Marshal(v)
+		if err != nil {
+			return nil
+		}
 
-	b, err := json.Marshal(v)
-	if err != nil {
-		return ""
+		return []string{string(b)}
 	}
 
-	return string(b)
+	ss := strings.Split(s, store.lookupKey.IFS)
+	ret := make([]string, 0, len(ss))
+	for _, s := range ss {
+		if containsAny(s, store.lookupKey.Exclude) {
+			continue
+		}
+		b, err := json.Marshal(s)
+		if err != nil {
+			continue
+		}
+		ret = append(ret, string(b))
+	}
+
+	return ret
 }
 
-func (store *Store) LookupKey() string {
+func containsAny(s string, needles []string) bool {
+	for _, needle := range needles {
+		if strings.Contains(s, needle) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (store *Store) LookupKey() LookupKey {
 	return store.lookupKey
 }
 

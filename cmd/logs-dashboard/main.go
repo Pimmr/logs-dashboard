@@ -22,13 +22,15 @@ var (
 
 func main() {
 	var (
-		exclude       []string
-		durations     []string
-		lookupKey     string
-		cpuProfile    string
-		initialFilter string
-		stacktrace    bool
-		maxSort       = 200
+		exclude          []string
+		durations        []string
+		lookupKey        string
+		lookupKeyIFS     string
+		lookupKeyExclude []string
+		cpuProfile       string
+		initialFilter    string
+		stacktrace       bool
+		maxSort          = 200
 	)
 
 	stop := make(chan struct{})
@@ -38,6 +40,8 @@ func main() {
 			rig.Repeatable(&exclude, rig.StringGenerator(), "exclude", "EXCLUDE", "hide keys"),
 			rig.Repeatable(&durations, rig.StringGenerator(), "durations", "DURATIONS", "hide keys"),
 			rig.String(&lookupKey, "lookup-key", "LOOKUP_KEY", "key to use for lookups"),
+			rig.String(&lookupKeyIFS, "lookup-key-ifs", "LOOKUP_KEY_IFS", "separator to use in lookup key"),
+			rig.Repeatable(&lookupKeyExclude, rig.StringGenerator(), "lookup-key-exclude", "LOOKUP_KEY_EXCLUDE", "parts to ignore if -lookup-key-ifs is used"),
 			rig.String(&cpuProfile, "cpu-profile", "CPU_PROFILE", "cpu profile file"),
 			rig.String(&initialFilter, "filter", "INITIAL_FILTER", "initial filter"),
 			rig.Bool(&stacktrace, "stacktrace", "STACKTRACE", "expand stack traces"),
@@ -72,7 +76,11 @@ func main() {
 		}
 	}
 
-	store := NewStore(lookupKey, maxSort)
+	store := NewStore(LookupKey{
+		Key:     lookupKey,
+		IFS:     lookupKeyIFS,
+		Exclude: lookupKeyExclude,
+	}, maxSort)
 
 	filter := NewFilter()
 	if initialFilter != "" {

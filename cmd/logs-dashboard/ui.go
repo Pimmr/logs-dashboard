@@ -73,6 +73,8 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 	mode := NormalMode
 	selected := -1
 	lookupHold := ""
+	headHold := []string{}
+	tailHold := []string{}
 
 	showingHelp := false
 
@@ -494,7 +496,7 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 			if mode == NormalMode {
 				return
 			}
-			if store.LookupKey() == "" {
+			if store.LookupKey().IsZero() {
 				mode = NormalMode
 				selected = -1
 				selectedID = 0
@@ -502,16 +504,72 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 				return
 			}
 			mode = NormalMode
-			lookupValue := store.LookupValue(selectedID)
+			lookupValues := store.LookupValues(selectedID)
 			lastFilterTime = 0
 			selected = -1
 			selectedID = 0
-			if lookupValue == "" {
+			if len(lookupValues) == 0 {
 				filter.Set(lookupHold)
 				exprBox.SetText(lookupHold)
 				return
 			}
-			q := fmt.Sprintf("%s ~= %s", store.LookupKey(), lookupValue)
+			qq := make([]string, len(lookupValues))
+			for i, value := range lookupValues {
+				qq[i] = fmt.Sprintf("%s ~= %s", store.LookupKey().Key, value)
+			}
+			q := joinFilters(qq)
+			filter.Set(q)
+			exprBox.SetText(q)
+			headHold = []string{}
+			tailHold = []string{}
+		},
+		'[': func() {
+			if lookupHold == "" {
+				return
+			}
+			q := filter.Query()
+			qq := strings.Split(q, "||")
+			if len(qq) < 2 {
+				return
+			}
+			q = joinFilters(qq[1:])
+			headHold = append(headHold, qq[0])
+			filter.Set(q)
+			exprBox.SetText(q)
+		},
+		'{': func() {
+			if lookupHold == "" || len(headHold) == 0 {
+				return
+			}
+			q := filter.Query()
+			qq := strings.Split(q, "||")
+			q = joinFilters(headHold[len(headHold)-1:], qq)
+			headHold = headHold[:len(headHold)-1]
+			filter.Set(q)
+			exprBox.SetText(q)
+		},
+		']': func() {
+			if lookupHold == "" {
+				return
+			}
+			q := filter.Query()
+			qq := strings.Split(q, "||")
+			if len(qq) < 2 {
+				return
+			}
+			q = joinFilters(qq[:len(qq)-1])
+			tailHold = append(qq[len(qq)-1:], tailHold...)
+			filter.Set(q)
+			exprBox.SetText(q)
+		},
+		'}': func() {
+			if lookupHold == "" || len(tailHold) == 0 {
+				return
+			}
+			q := filter.Query()
+			qq := strings.Split(q, "||")
+			q = joinFilters(qq, tailHold[:1])
+			tailHold = tailHold[1:]
 			filter.Set(q)
 			exprBox.SetText(q)
 		},
@@ -590,6 +648,18 @@ func NewUI(store *Store, filter *Filter, prettifier *Prettifier, filterHistory, 
 	return &UI{
 		app: app,
 	}
+}
+
+func joinFilters(filters ...[]string) string {
+	ff := []string{}
+
+	for _, filter := range filters {
+		for _, f := range filter {
+			ff = append(ff, strings.TrimSpace(f))
+		}
+	}
+
+	return strings.Join(ff, " || ")
 }
 
 func prompt(paused bool) string {
