@@ -16,6 +16,7 @@ type Prettifier struct {
 	jsonFormatter *logrus.JSONFormatter
 
 	durationFields   []string
+	messageKeys      []string
 	filterFields     []string
 	filterExclude    bool
 	useJSONFormatter bool
@@ -25,7 +26,7 @@ type Prettifier struct {
 	stacktrace       bool
 }
 
-func NewPrettifier(filter, durations []string, stacktrace bool) *Prettifier {
+func NewPrettifier(filter, durations, messageKeys []string, stacktrace bool) *Prettifier {
 	p := &Prettifier{
 		m: &sync.RWMutex{},
 		jsonFormatter: &logrus.JSONFormatter{
@@ -34,6 +35,7 @@ func NewPrettifier(filter, durations []string, stacktrace bool) *Prettifier {
 		filterFields:   filter,
 		filterExclude:  true,
 		durationFields: durations,
+		messageKeys:    messageKeys,
 		fullTime:       false,
 		colors:         true,
 		stacktrace:     stacktrace,
@@ -200,11 +202,17 @@ func (p *Prettifier) Prettify(in []byte, selected bool) []byte {
 		return append(prefix, append(in, suffix...)...)
 	}
 
-	msg, ok := fields["msg"].(string)
-	if !ok {
-		msg = "-"
+	var (
+		msg string = "-"
+		ok  bool
+	)
+	for _, field := range p.messageKeys {
+		msg, ok = fields[field].(string)
+		if ok {
+			delete(fields, field)
+			break
+		}
 	}
-	delete(fields, "msg")
 	levelStr, ok := fields["level"].(string)
 	if ok {
 		delete(fields, "level")

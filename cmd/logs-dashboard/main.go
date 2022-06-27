@@ -24,6 +24,7 @@ func main() {
 	var (
 		exclude          []string
 		durations        []string
+		messageKeys      = []string{"msg", "message"}
 		lookupKey        string
 		lookupKeyIFS     string
 		lookupKeyExclude []string
@@ -38,7 +39,8 @@ func main() {
 		FlagSet: rig.DefaultFlagSet(),
 		Flags: []*rig.Flag{
 			rig.Repeatable(&exclude, rig.StringGenerator(), "exclude", "EXCLUDE", "hide keys"),
-			rig.Repeatable(&durations, rig.StringGenerator(), "durations", "DURATIONS", "hide keys"),
+			rig.Repeatable(&durations, rig.StringGenerator(), "durations", "DURATIONS", "duration keys"),
+			rig.Repeatable(&messageKeys, rig.StringGenerator(), "message-keys", "MESSAGE_KEYS", "message keys"),
 			rig.String(&lookupKey, "lookup-key", "LOOKUP_KEY", "key to use for lookups"),
 			rig.String(&lookupKeyIFS, "lookup-key-ifs", "LOOKUP_KEY_IFS", "separator to use in lookup key"),
 			rig.Repeatable(&lookupKeyExclude, rig.StringGenerator(), "lookup-key-exclude", "LOOKUP_KEY_EXCLUDE", "parts to ignore if -lookup-key-ifs is used"),
@@ -89,7 +91,7 @@ func main() {
 	store.AddKnownFields(filter.Keywords()...)
 	store.AddKnownFields("raw")
 
-	prettifier := NewPrettifier(exclude, durations, stacktrace)
+	prettifier := NewPrettifier(exclude, durations, messageKeys, stacktrace)
 	filterHistory := NewHistory(loadFilterHistory())
 	excludeHistory := NewHistory(loadExcludeHistory(strings.Join(prettifier.GetFilterFields(), ",")))
 
