@@ -8,13 +8,15 @@ import (
 )
 
 type Filter struct {
-	queries []string
-	m       *sync.Mutex
+	queries     []string
+	messageKeys []string
+	m           *sync.Mutex
 }
 
-func NewFilter() *Filter {
+func NewFilter(messageKeys []string) *Filter {
 	return &Filter{
-		m: &sync.Mutex{},
+		messageKeys: messageKeys,
+		m:           &sync.Mutex{},
 	}
 }
 
@@ -65,6 +67,14 @@ func (f *Filter) Execute(id uint64, b []byte) (_ []byte, returnErr error) {
 		}
 		if m["_id"] == nil {
 			m["_id"] = int64(id)
+		}
+		if m["_msg"] == nil {
+			for _, k := range f.messageKeys {
+				if v, ok := m[k]; ok {
+					m["_msg"] = v
+					break
+				}
+			}
 		}
 	}
 

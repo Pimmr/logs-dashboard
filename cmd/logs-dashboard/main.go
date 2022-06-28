@@ -84,7 +84,7 @@ func main() {
 		Exclude: lookupKeyExclude,
 	}, maxSort)
 
-	filter := NewFilter()
+	filter := NewFilter(messageKeys)
 	if initialFilter != "" {
 		filter.Set(initialFilter)
 	}
